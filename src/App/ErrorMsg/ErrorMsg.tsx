@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import type { ErrorType } from "../../useLoader";
+import type { ErrorType } from "utils/useLoader";
 import "./ErrorMsg.css";
 
 const errorMessages: Record<ErrorType, string> = {

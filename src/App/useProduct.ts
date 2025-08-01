@@ -1,4 +1,4 @@
-import { type ErrorType, useLoader } from "../useLoader";
+import { type ErrorType, useLoader } from "utils/useLoader";
 
 export type Product = {
     id: number;
