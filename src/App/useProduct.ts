@@ -5,6 +5,8 @@ export type Product = {
     title: string;
 }
 
+export type ErrorType = "none" | "network" | "server" | "unknown";
+
 export function useProduct({
     longAnswer,
     networkError,
@@ -14,7 +16,7 @@ export function useProduct({
     serverError: boolean;
     longAnswer: boolean;
 }): {
-    isError: boolean;
+    errorType: ErrorType;
     isLoading: boolean;
     products: Product[];
     fetchProducts: () => Promise<void>,
@@ -22,7 +24,7 @@ export function useProduct({
 } {
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [isError, setIsError] = useState<boolean>(false);
+    const [errorType, setErrorType] = useState<ErrorType>("none");
 
     const domain = networkError ? "dummyjsn.com" : "dummyjson.com";
     const entity = serverError ? "blabla" : "products";
@@ -36,7 +38,7 @@ export function useProduct({
         const signal = abortController.signal;
 
         setIsLoading(true);
-        setIsError(false);
+        setErrorType("none");
         try {
             const response = await fetch(url, {
                 method: "GET",
@@ -46,20 +48,20 @@ export function useProduct({
                 signal,
             });
             if (!response.ok) {
-                setIsError(true);
+                setErrorType("server");
                 return;
             }
             const data = await response.json();
             if (data.products) {
                 setProducts(data.products);
             } else {
-                setIsError(true);
+                setErrorType("server");
             }
         } catch (error) {
             if (error instanceof Error && error.name === "AbortError") {
                 return;
             }
-            setIsError(true);
+            setErrorType(error instanceof TypeError ? "network" : "unknown");
         } finally {
             setIsLoading(false);
         }
@@ -70,10 +72,10 @@ export function useProduct({
     }, []);
 
     return {
-        isError: isError,
-        isLoading: isLoading,
-        fetchProducts: fetchProducts,
-        abort: abort,
+        errorType,
+        isLoading,
+        fetchProducts,
+        abort,
         products,
     };
 }

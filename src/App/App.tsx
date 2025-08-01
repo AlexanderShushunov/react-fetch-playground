@@ -3,14 +3,16 @@ import { useEffect, useState } from "react";
 import { useProduct } from "./useProduct.ts";
 import { Checkbox } from "./Checkbox.tsx";
 import { Products } from "./Products.tsx";
+import { LoadingSpinner } from "./LoadingSpinner";
+import { ErrorMsg } from "./ErrorMsg";
 
-function App() {
+export function App() {
     const [longAnswer, setLongAnswer] = useState<boolean>(false);
     const [networkError, setNetworkError] = useState<boolean>(false);
     const [serverError, setServerError] = useState<boolean>(false);
 
     const {
-        isError,
+        errorType,
         isLoading,
         products,
         fetchProducts,
@@ -34,14 +36,14 @@ function App() {
                 <Checkbox label="Long answer (5 sec)" value={longAnswer} onChange={setLongAnswer} />
                 <Checkbox label="Network error" value={networkError} onChange={setNetworkError} />
                 <Checkbox label="Server error" value={serverError} onChange={setServerError} />
-                <button onClick={fetchProducts}>Fetch</button>
-                <button onClick={abort} disabled={!isLoading}>Abort</button>
+                <div className="button-group">
+                    <button onClick={fetchProducts} disabled={isLoading}>Fetch</button>
+                    <button onClick={abort} disabled={!isLoading}>Abort</button>
+                </div>
             </div>
-            {isError && <span className="error">Error</span>}
-            {isLoading && <span className="loading">...loading</span>}
+            <ErrorMsg errorType={errorType} />
+            {isLoading && <LoadingSpinner />}
             <Products products={products} />
         </>
     );
 }
-
-export default App;
