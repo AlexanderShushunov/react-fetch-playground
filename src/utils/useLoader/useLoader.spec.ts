@@ -32,9 +32,8 @@ describe("useLoader", () => {
         global.fetch = originalFetch;
     });
 
-    it.only("should initialize with correct initial state", () => {
+    it("should initialize with correct initial state", () => {
         const { result } = renderHook(() => useLoader({
-            url: url,
             initialValue: initialValue,
         }));
 
@@ -43,19 +42,18 @@ describe("useLoader", () => {
         expect(result.current.errorType).toBe("none");
     });
 
-    it.only("should successfully load data", async () => {
+    it("should successfully load data", async () => {
         mockedFetch.mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve(responseData),
         } as Response);
 
         const { result } = renderHook(() => useLoader({
-            url: url,
             initialValue: initialValue,
         }));
 
         await act(async () => {
-            await result.current.load();
+            await result.current.load(url);
         });
 
         expect(mockedFetch).toHaveBeenCalledWith(
@@ -72,16 +70,15 @@ describe("useLoader", () => {
         expect(result.current.errorType).toBe("none");
     });
 
-    it.only("should handle network errors", async () => {
+    it("should handle network errors", async () => {
         mockedFetch.mockRejectedValueOnce(new Error("Network error"));
 
         const { result } = renderHook(() => useLoader({
-            url: url,
             initialValue: initialValue,
         }));
 
         await act(async () => {
-            await result.current.load();
+            await result.current.load(url);
         });
 
         expect(result.current.errorType).toBe("network");
@@ -89,7 +86,7 @@ describe("useLoader", () => {
         expect(result.current.value).toEqual(initialValue);
     });
 
-    it.only("should handle server errors", async () => {
+    it("should handle server errors", async () => {
         mockedFetch.mockResolvedValueOnce({
             ok: false,
             status: 500,
@@ -97,12 +94,11 @@ describe("useLoader", () => {
         } as Response);
 
         const { result } = renderHook(() => useLoader({
-            url: url,
             initialValue: initialValue,
         }));
 
         await act(async () => {
-            await result.current.load();
+            await result.current.load(url);
         });
 
         expect(result.current.errorType).toBe("server");
@@ -110,19 +106,18 @@ describe("useLoader", () => {
         expect(result.current.value).toEqual(initialValue);
     });
 
-    it.only("should handle unknown errors", async () => {
+    it("should handle unknown errors", async () => {
         mockedFetch.mockResolvedValueOnce({
             ok: true,
             json: () => Promise.reject("ups"),
         } as Response);
 
         const { result } = renderHook(() => useLoader({
-            url: url,
             initialValue: initialValue,
         }));
 
         await act(async () => {
-            await result.current.load();
+            await result.current.load(url);
         });
 
         expect(result.current.errorType).toBe("unknown");
@@ -130,7 +125,7 @@ describe("useLoader", () => {
         expect(result.current.value).toEqual(initialValue);
     });
 
-    it.only("should set loading state correctly during load operation", async () => {
+    it("should set loading state correctly during load operation", async () => {
         let resolvePromise: (val: unknown) => void;
         const slowPromise = new Promise<unknown>(resolve => {
             resolvePromise = resolve;
@@ -142,13 +137,13 @@ describe("useLoader", () => {
         } as Response);
 
         const { result } = renderHook(() => useLoader({
-            url: url,
             initialValue: initialValue,
         }));
 
         let res: Promise<unknown>;
-        act(() => {
-            res = result.current.load();
+        await act(async () => {
+            res = result.current.load(url);
+            await Promise.resolve();
         });
 
         expect(result.current.isLoading).toBe(true);
@@ -163,16 +158,15 @@ describe("useLoader", () => {
         expect(result.current.isLoading).toBe(false);
     });
 
-    it.only("should reset error type when starting new load", async () => {
+    it("should reset error type when starting new load", async () => {
         mockedFetch.mockRejectedValueOnce(new Error("Network error"));
 
         const { result } = renderHook(() => useLoader({
-            url: url,
             initialValue: initialValue,
         }));
 
         await act(async () => {
-            await result.current.load();
+            await result.current.load(url);
         });
 
         expect(result.current.errorType).toBe("network");
@@ -183,24 +177,43 @@ describe("useLoader", () => {
         } as Response);
 
         await act(async () => {
-            await result.current.load();
+            await result.current.load(url);
         });
 
         expect(result.current.errorType).toBe("none");
         expect(result.current.value).toEqual(responseData);
     });
 
+    it("should pass parms to withRetry", async () => {
+        const { result } = renderHook(() => useLoader({
+            initialValue: initialValue,
+            delayStep: 7,
+            maxRetries: 900,
+        }));
+
+        await act(async () => {
+            await result.current.load(url);
+        });
+
+        expect(withRetryMock).toHaveBeenCalledTimes(1);
+        expect(withRetryMock).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({
+                delayStep: 7,
+                maxRetries: 900,
+            }));
+    });
+
     describe("abort", () => {
-        it.only("should abort fetching when it is aborted", async () => {
+        it("should abort fetching when it is aborted", async () => {
             mockedFetch.mockRejectedValue(new DOMException("Operation aborted", "AbortError"));
 
             const { result } = renderHook(() => useLoader({
-                url: url,
                 initialValue: initialValue,
             }));
 
             await act(async () => {
-                await result.current.load();
+                await result.current.load(url);
             });
 
             expect(result.current.errorType).toBe("none");
@@ -208,20 +221,25 @@ describe("useLoader", () => {
             expect(result.current.value).toEqual(initialValue);
         });
 
-        it.only("should pass abort signal to fetch and withRetry", async () => {
+        it("should pass abort signal to fetch and withRetry", async () => {
+            let rejectPromise: (val: unknown) => void;
+            const slowPromise = new Promise<unknown>((_, reject) => {
+                rejectPromise = reject;
+            });
+
             mockedFetch.mockResolvedValueOnce({
                 ok: true,
-                json: () => Promise.resolve(responseData),
+                json: () => slowPromise,
             } as Response);
 
             const { result } = renderHook(() => useLoader({
-                url: url,
                 initialValue: initialValue,
             }));
 
             let res: Promise<unknown>;
-            act(() => {
-                res = result.current.load();
+            await act(async () => {
+                res = result.current.load(url);
+                await Promise.resolve();
             });
 
             expect(mockedFetch.mock.calls[0][1]?.signal?.aborted).toBe(false);
@@ -235,10 +253,77 @@ describe("useLoader", () => {
             expect(withRetryMock.mock.calls[0][1]?.signal?.aborted).toBe(true);
 
             await act(async () => {
+                rejectPromise(new DOMException("Operation aborted", "AbortError"));
                 await res;
             });
         });
+    });
 
+    describe("race", () => {
+        let secondResolve: (val: unknown) => void;
+        beforeEach(() => {
+            const secondSlowPromise = new Promise<unknown>(resolve => {
+                secondResolve = resolve;
+            });
+
+            mockedFetch
+                .mockImplementationOnce((_, init) => {
+                    return new Promise<Response>((_, reject) => {
+                        init?.signal?.addEventListener(
+                            "abort",
+                            () => reject(new DOMException("Operation aborted", "AbortError")),
+                            { once: true },
+                        );
+                    });
+                })
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: () => secondSlowPromise,
+                } as Response);
+        });
+
+        it(`if a second request is made before the first one finishes,
+                 we need to abort the first request,
+                 preserve the error and isLoading state,
+                 and return the result of the second request.`, async () => {
+            const { result } = renderHook(() => useLoader({
+                initialValue: initialValue,
+            }));
+
+            let firstRes: Promise<unknown>;
+            await act(async () => {
+                firstRes = result.current.load(url);
+                await Promise.resolve();
+            });
+
+            expect(result.current.errorType).toBe("none");
+            expect(result.current.isLoading).toBe(true);
+
+            let secondRes: Promise<unknown>;
+            await act(async () => {
+                secondRes = result.current.load(url);
+                await Promise.resolve();
+            });
+
+            expect(result.current.errorType).toBe("none");
+            expect(result.current.isLoading).toBe(true);
+
+            await act(async () => {
+                await firstRes;
+            })
+
+            expect(result.current.errorType).toBe("none");
+            expect(result.current.isLoading).toBe(true);
+
+            await act(async () => {
+                secondResolve(responseData);
+                await secondRes;
+            })
+
+            expect(result.current.errorType).toBe("none");
+            expect(result.current.isLoading).toBe(false);
+            expect(result.current.value).toBe(responseData);
+        });
     });
 });
 

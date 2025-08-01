@@ -5,16 +5,18 @@ import { isAbortError } from "../isAbortError.ts";
 export type ErrorType = "none" | "network" | "server" | "unknown";
 
 export function useLoader<T>({
-    url,
     initialValue,
+    maxRetries = 3,
+    delayStep = 200,
 }: {
-    url: string;
     initialValue: T;
+    maxRetries?: number,
+    delayStep?: number,
 }): {
     errorType: ErrorType;
     isLoading: boolean;
     value: T;
-    load: () => Promise<void>,
+    load: (url: string) => Promise<void>,
     abort: () => void;
 } {
     const [value, setValue] = useState<T>(initialValue);
@@ -22,8 +24,29 @@ export function useLoader<T>({
     const [errorType, setErrorType] = useState<ErrorType>("none");
 
     const abortControllerRef = useRef<AbortController | null>(null);
+    const prevOperationRef = useRef<Promise<void> | null>(null);
+    const isRaceRef = useRef<boolean>(false);
 
-    const load = useCallback(async () => {
+    const abort = useCallback(() => {
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = null;
+    }, []);
+
+    const abortPrevAndWait = useCallback(async () => {
+        if (abortControllerRef.current) {
+            isRaceRef.current = true;
+            abort();
+            try {
+                await prevOperationRef.current;
+            } catch {
+                // do nothing
+            }
+            isRaceRef.current = false;
+        }
+    }, [abort]);
+
+    const load = useCallback(async (url: string) => {
+        await abortPrevAndWait();
         setIsLoading(true);
         setErrorType("none");
         const controller = new AbortController();
@@ -52,11 +75,11 @@ export function useLoader<T>({
             return await response.json();
         }, {
             signal,
-            maxRetries: 10,
-            delayStep: 200,
+            maxRetries: maxRetries,
+            delayStep: delayStep,
         })();
 
-        result
+        prevOperationRef.current = result
             .then(value => setValue(value))
             .catch((error) => {
                 if (isAbortError(error)) {
@@ -70,13 +93,13 @@ export function useLoader<T>({
                 }
             })
             .finally(() => {
-                setIsLoading(false)
+                if (isRaceRef.current) {
+                    return;
+                }
+                setIsLoading(false);
+                abortControllerRef.current = null;
             });
-    }, [url]);
-
-    const abort = useCallback(() => {
-        abortControllerRef.current?.abort();
-    }, []);
+    }, [maxRetries, delayStep, abortPrevAndWait]);
 
     return {
         errorType,

@@ -1,43 +1,67 @@
 import { type ErrorType, useLoader } from "utils/useLoader";
+import { useCallback } from "react";
 
 export type Product = {
     id: number;
     title: string;
 }
 
+const pageSize = 10;
+
 export function useProduct({
-    longAnswer,
-    networkError,
-    serverError,
+    maxRetries,
+    delayStep,
 }: {
-    networkError: boolean,
-    serverError: boolean;
-    longAnswer: boolean;
+    maxRetries?: number,
+    delayStep?: number,
 }): {
     errorType: ErrorType;
     isLoading: boolean;
     products: Product[];
-    fetchProducts: () => Promise<void>,
+    fetchProducts: (options?: {
+        networkError?: boolean,
+        serverError?: boolean;
+        longAnswer?: boolean;
+        page?: number;
+    }) => Promise<void>,
     abort: () => void;
 } {
-    const domain = networkError ? "dummyjsn.com" : "dummyjson.com";
-    const entity = serverError ? "blabla" : "products";
-    const delay = longAnswer ? 5000 : 0;
-    const url = `https://${domain}/${entity}?limit=10&select=title&delay=${delay}`;
-
     const {
         errorType,
         isLoading,
         value,
         load,
         abort,
-    } = useLoader<{products: Product[]}>({url, initialValue: {products: []}})
+    } = useLoader<{ products: Product[] }>({
+        initialValue: { products: [] },
+        maxRetries,
+        delayStep,
+    });
+
+    const fetchProducts = useCallback(
+        ({
+            networkError = false,
+            serverError = false,
+            longAnswer = false,
+            page = 0,
+        }: {
+            networkError?: boolean,
+            serverError?: boolean;
+            longAnswer?: boolean;
+            page?: number;
+        } = {}) => {
+            const domain = networkError ? "dummyjsn.com" : "dummyjson.com";
+            const entity = serverError ? "blabla" : "products";
+            const delay = longAnswer ? 5000 : 0;
+            const url = `https://${domain}/${entity}?limit=${pageSize}&skip=${page * pageSize}&select=title&delay=${delay}`;
+            return load(url);
+        }, [load]);
 
     return {
         errorType,
         isLoading,
         products: value.products,
-        fetchProducts: load,
+        fetchProducts: fetchProducts,
         abort,
     };
 }
