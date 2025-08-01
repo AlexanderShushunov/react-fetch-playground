@@ -1,5 +1,7 @@
 # Fetch Playground
 
+[in action](https://react-fetch-playground.vercel.app/)
+
 A project to explore and implement robust data fetching patterns in React applications.
 
 ## Overview
@@ -24,6 +26,7 @@ A powerful React hook that simplifies data fetching by managing:
 - Loading states
 - Error handling
 - Request cancellation
+- Prevent race conditions
 
 ### withRetry
 
@@ -40,4 +43,3 @@ in a practical context:
 - Products listing with fetch (thanx https://dummyjson.com for api)
 - Error handling
 - Loading states
-- 
