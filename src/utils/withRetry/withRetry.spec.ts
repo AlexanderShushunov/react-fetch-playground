@@ -114,16 +114,13 @@ describe("withRetry", () => {
 
         const retryableAction = withRetry(mockAction, { maxRetries: 7, delayStep: 50 });
 
-        const resultPromise = retryableAction().catch(
-            (error) => {
-                expect(error).toEqual(error);
-            },
-        );
+        const resultPromise = retryableAction();
+        const expectation = expect(resultPromise).rejects.toBe(error);
 
         await jest.advanceTimersByTimeAsync(100500);
 
         expect(mockAction).toHaveBeenCalledTimes(7);
-        await resultPromise;
+        await expectation;
     });
 
     it("should use growing delay between retries", async () => {
