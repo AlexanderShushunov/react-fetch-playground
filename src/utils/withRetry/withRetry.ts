@@ -19,7 +19,7 @@ export function withRetry<T>(
         }
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                // assuming action is will be aborted if signal is aborted
+                // the provided action must listen to the AbortSignal and stop if it is triggered
                 return await action();
             } catch (error) {
                 if (isAbortError(error)) {
