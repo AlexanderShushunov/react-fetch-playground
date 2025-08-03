@@ -45,7 +45,7 @@ export function useLoader<T>({
         }
     }, [abort]);
 
-    const load = useCallback(async (url: string) => {
+    const load = useCallback(async (url: string): Promise<void> => {
         await abortPrevAndWait();
         setIsLoading(true);
         setErrorType("none");
@@ -80,7 +80,9 @@ export function useLoader<T>({
         })();
 
         prevOperationRef.current = result
-            .then(value => setValue(value))
+            .then(value => {
+                setValue(value);
+            })
             .catch((error) => {
                 if (isAbortError(error)) {
                     // do nothing, the operation was aborted
@@ -99,6 +101,8 @@ export function useLoader<T>({
                 setIsLoading(false);
                 abortControllerRef.current = null;
             });
+
+        return prevOperationRef.current;
     }, [maxRetries, delayStep, abortPrevAndWait]);
 
     return {

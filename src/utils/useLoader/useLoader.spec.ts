@@ -158,6 +158,42 @@ describe("useLoader", () => {
         expect(result.current.isLoading).toBe(false);
     });
 
+    it("should resolve load promise only after data is fetched", async () => {
+        let resolveJson: (val: unknown) => void;
+        const slowPromise = new Promise<unknown>(resolve => {
+            resolveJson = resolve;
+        });
+
+        mockedFetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => slowPromise,
+        } as Response);
+
+        const { result } = renderHook(() => useLoader({
+            initialValue: initialValue,
+        }));
+
+        let loadResolved = false;
+        let promise: Promise<unknown>;
+        await act(async () => {
+            promise = result.current.load(url);
+            promise.then(() => {
+                loadResolved = true;
+            });
+            await Promise.resolve();
+        });
+
+        expect(loadResolved).toBe(false);
+
+        await act(async () => {
+            resolveJson(responseData);
+            await promise;
+        });
+
+        expect(loadResolved).toBe(true);
+        expect(result.current.value).toEqual(responseData);
+    });
+
     it("should reset error type when starting new load", async () => {
         mockedFetch.mockRejectedValueOnce(new Error("Network error"));
 
