@@ -2,7 +2,7 @@ export default {
     testEnvironment: "jest-environment-jsdom",
     transform: {
         "^.+\\.(ts|tsx)$": ["ts-jest", {
-            tsconfig: "tsconfig.node.json",
+            tsconfig: "tsconfig.test.json",
         }],
 
     },
