@@ -10,13 +10,13 @@ export function useLoader<T>({
     delayStep = 200,
 }: {
     initialValue: T;
-    maxRetries?: number,
-    delayStep?: number,
+    maxRetries?: number;
+    delayStep?: number;
 }): {
     errorType: ErrorType;
     isLoading: boolean;
     value: T;
-    load: (url: string) => Promise<void>,
+    load: (url: string) => Promise<void>;
     abort: () => void;
 } {
     const [value, setValue] = useState<T>(initialValue);
@@ -24,29 +24,17 @@ export function useLoader<T>({
     const [errorType, setErrorType] = useState<ErrorType>("none");
 
     const abortControllerRef = useRef<AbortController | null>(null);
-    const prevOperationRef = useRef<Promise<void> | null>(null);
-    const isRaceRef = useRef<boolean>(false);
+    const currentRequestId = useRef(0);
 
     const abort = useCallback(() => {
         abortControllerRef.current?.abort();
         abortControllerRef.current = null;
     }, []);
 
-    const abortPrevAndWait = useCallback(async () => {
-        if (abortControllerRef.current) {
-            isRaceRef.current = true;
-            abort();
-            try {
-                await prevOperationRef.current;
-            } catch {
-                // do nothing
-            }
-            isRaceRef.current = false;
-        }
-    }, [abort]);
-
     const load = useCallback(async (url: string): Promise<void> => {
-        await abortPrevAndWait();
+        abort();
+        currentRequestId.current++;
+        const requestId = currentRequestId.current;
         setIsLoading(true);
         setErrorType("none");
         const controller = new AbortController();
@@ -79,11 +67,17 @@ export function useLoader<T>({
             delayStep: delayStep,
         })();
 
-        prevOperationRef.current = result
+        return result
             .then(value => {
+                if (requestId !== currentRequestId.current) {
+                    return;
+                }
                 setValue(value);
             })
             .catch((error) => {
+                if (requestId !== currentRequestId.current) {
+                    return;
+                }
                 if (isAbortError(error)) {
                     // do nothing, the operation was aborted
                 } else if (error instanceof Error && error.message === "network") {
@@ -95,15 +89,13 @@ export function useLoader<T>({
                 }
             })
             .finally(() => {
-                if (isRaceRef.current) {
+                if (requestId !== currentRequestId.current) {
                     return;
                 }
                 setIsLoading(false);
                 abortControllerRef.current = null;
             });
-
-        return prevOperationRef.current;
-    }, [maxRetries, delayStep, abortPrevAndWait]);
+    }, [maxRetries, delayStep, abort]);
 
     return {
         errorType,
@@ -113,3 +105,4 @@ export function useLoader<T>({
         value,
     };
 }
+
